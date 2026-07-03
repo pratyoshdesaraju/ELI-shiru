@@ -119,7 +119,7 @@ This flow is designed to feel like a tutor who adjusts to your existing experien
 - Single `/explain` API that takes `{ question, level }` and returns a structured explanation.  
 - React UI with question input, level selection, loading state, and response display.
 
-### Phase 2 (planned)
+### Phase 2 (planned, Currently WIP)
 
 - **Document upload:** Let users attach their own PDFs/notes for ingestion.  
 - **Embeddings + vector store:** Chunk documents, create embeddings, and store them in a local vector database.  
