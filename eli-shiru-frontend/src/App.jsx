@@ -8,6 +8,8 @@ function App() {
   const [level, setLevel] = useState("ELI5");
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState(null);
+  const [regeneratingIndex, setRegeneratingIndex] = useState(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -18,12 +20,32 @@ function App() {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, regeneratingIndex]);
+
+  const fetchExplanation = async (questionText, levelValue) => {
+    const res = await fetch("http://127.0.0.1:8000/explain", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        question: questionText,
+        level: levelValue,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(`Backend error: ${res.status}`);
+    }
+
+    const data = await res.json();
+    return data.explanation || "No explanation returned.";
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!question.trim() || isLoading) {
+    if (!question.trim() || isLoading || regeneratingIndex !== null) {
       return;
     }
 
@@ -41,29 +63,15 @@ function App() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("http://127.0.0.1:8000/explain", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          question: currentQuestion,
-          level: currentLevel,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error(`Backend error: ${res.status}`);
-      }
-
-      const data = await res.json();
+      const explanation = await fetchExplanation(currentQuestion, currentLevel);
 
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          text: data.explanation || "No explanation returned.",
+          text: explanation,
           level: currentLevel,
+          question: currentQuestion,
         },
       ]);
     } catch (err) {
@@ -74,12 +82,106 @@ function App() {
           role: "assistant",
           text: "Sorry, something went wrong talking to the backend. Check the console and that uvicorn is running.",
           level: currentLevel,
+          question: currentQuestion,
           isError: true,
         },
       ]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleCopyResponse = async (text, index) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMessageIndex(index);
+      setTimeout(() => {
+        setCopiedMessageIndex((current) => (current === index ? null : current));
+      }, 1500);
+    } catch (err) {
+      console.error("Copy failed:", err);
+    }
+  };
+
+  const handleRegenerate = async (assistantIndex) => {
+    if (isLoading || regeneratingIndex !== null) {
+      return;
+    }
+
+    const assistantMessage = messages[assistantIndex];
+    if (!assistantMessage || assistantMessage.role !== "assistant") {
+      return;
+    }
+
+    let relatedQuestion = assistantMessage.question;
+    let relatedLevel = assistantMessage.level;
+
+    if (!relatedQuestion) {
+      for (let i = assistantIndex - 1; i >= 0; i -= 1) {
+        if (messages[i].role === "user") {
+          relatedQuestion = messages[i].text;
+          relatedLevel = messages[i].level;
+          break;
+        }
+      }
+    }
+
+    if (!relatedQuestion) {
+      return;
+    }
+
+    setRegeneratingIndex(assistantIndex);
+
+    try {
+      const explanation = await fetchExplanation(relatedQuestion, relatedLevel);
+
+      setMessages((prev) =>
+        prev.map((msg, idx) =>
+          idx === assistantIndex
+            ? {
+                ...msg,
+                text: explanation,
+                level: relatedLevel,
+                question: relatedQuestion,
+                isError: false,
+              }
+            : msg
+        )
+      );
+    } catch (err) {
+      console.error(err);
+      setMessages((prev) =>
+        prev.map((msg, idx) =>
+          idx === assistantIndex
+            ? {
+                ...msg,
+                text: "Sorry, something went wrong talking to the backend. Check the console and that uvicorn is running.",
+                isError: true,
+              }
+            : msg
+        )
+      );
+    } finally {
+      setRegeneratingIndex(null);
+    }
+  };
+
+  const iconButtonStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "0.4rem",
+    padding: "0.42rem 0.7rem",
+    borderRadius: "9999px",
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "rgba(255,255,255,0.05)",
+    color: "rgba(226, 232, 240, 0.88)",
+    fontSize: "0.78rem",
+    fontWeight: 500,
+    cursor: "pointer",
+    backdropFilter: "blur(10px)",
+    WebkitBackdropFilter: "blur(10px)",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+    transition: "all 0.2s ease",
   };
 
   return (
@@ -270,63 +372,136 @@ function App() {
               </div>
             )}
 
-            {messages.map((msg, idx) => (
-              <div
-                key={idx}
-                style={{
-                  alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                  maxWidth: "78%",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.25rem",
-                  minWidth: 0,
-                }}
-              >
+            {messages.map((msg, idx) => {
+              const isAssistant = msg.role === "assistant";
+              const isRegeneratingThis = regeneratingIndex === idx;
+
+              return (
                 <div
+                  key={idx}
                   style={{
-                    padding: "0.9rem 1.1rem",
-                    borderRadius: "1.25rem",
-                    borderBottomRightRadius:
-                      msg.role === "user" ? "0.35rem" : "1.25rem",
-                    borderBottomLeftRadius:
-                      msg.role === "assistant" ? "0.35rem" : "1.25rem",
-                    background:
-                      msg.role === "user"
-                        ? "linear-gradient(135deg, rgba(56,189,248,0.34), rgba(139,92,246,0.34))"
-                        : msg.isError
-                        ? "rgba(239, 68, 68, 0.14)"
-                        : "rgba(2, 6, 23, 0.42)",
-                    border:
-                      msg.role === "user"
-                        ? "1px solid rgba(56, 189, 248, 0.38)"
-                        : msg.isError
-                        ? "1px solid rgba(239, 68, 68, 0.35)"
-                        : "1px solid rgba(255, 255, 255, 0.10)",
-                    backdropFilter: "blur(10px)",
-                    WebkitBackdropFilter: "blur(10px)",
-                    whiteSpace: "pre-wrap",
-                    fontSize: "0.98rem",
-                    lineHeight: 1.58,
-                    color: "#f1f5f9",
-                    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
-                    wordBreak: "break-word",
-                    overflowWrap: "anywhere",
-                  }}
-                >
-                  {msg.text}
-                </div>
-                <span
-                  style={{
-                    fontSize: "0.72rem",
-                    color: "rgba(148, 163, 184, 0.55)",
                     alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                    padding: "0 0.35rem",
+                    maxWidth: "78%",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "0.25rem",
+                    minWidth: 0,
                   }}
                 >
-                  {msg.role === "user" ? "You" : "ELI-Shiru"} · {msg.level}
-                </span>
-              </div>
-            ))}
+                  <div
+                    style={{
+                      padding: "0.9rem 1.1rem",
+                      borderRadius: "1.25rem",
+                      borderBottomRightRadius:
+                        msg.role === "user" ? "0.35rem" : "1.25rem",
+                      borderBottomLeftRadius:
+                        msg.role === "assistant" ? "0.35rem" : "1.25rem",
+                      background:
+                        msg.role === "user"
+                          ? "linear-gradient(135deg, rgba(56,189,248,0.34), rgba(139,92,246,0.34))"
+                          : msg.isError
+                          ? "rgba(239, 68, 68, 0.14)"
+                          : "rgba(2, 6, 23, 0.42)",
+                      border:
+                        msg.role === "user"
+                          ? "1px solid rgba(56, 189, 248, 0.38)"
+                          : msg.isError
+                          ? "1px solid rgba(239, 68, 68, 0.35)"
+                          : "1px solid rgba(255, 255, 255, 0.10)",
+                      backdropFilter: "blur(10px)",
+                      WebkitBackdropFilter: "blur(10px)",
+                      whiteSpace: "pre-wrap",
+                      fontSize: "0.98rem",
+                      lineHeight: 1.58,
+                      color: "#f1f5f9",
+                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+                      wordBreak: "break-word",
+                      overflowWrap: "anywhere",
+                    }}
+                  >
+                    {msg.text}
+                  </div>
+
+                  <span
+                    style={{
+                      fontSize: "0.72rem",
+                      color: "rgba(148, 163, 184, 0.55)",
+                      alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                      padding: "0 0.35rem",
+                    }}
+                  >
+                    {msg.role === "user" ? "You" : "ELI-Shiru"} · {msg.level}
+                  </span>
+
+                  {isAssistant && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.5rem",
+                        flexWrap: "wrap",
+                        padding: "0 0.25rem",
+                        marginTop: "0.15rem",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleRegenerate(idx)}
+                        disabled={isLoading || regeneratingIndex !== null}
+                        style={{
+                          ...iconButtonStyle,
+                          opacity:
+                            isLoading || regeneratingIndex !== null ? 0.55 : 1,
+                          cursor:
+                            isLoading || regeneratingIndex !== null
+                              ? "default"
+                              : "pointer",
+                        }}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <path d="M21 2v6h-6" />
+                          <path d="M3 22v-6h6" />
+                          <path d="M21 8a9 9 0 0 0-15.5-3.36L3 8" />
+                          <path d="M3 16a9 9 0 0 0 15.5 3.36L21 16" />
+                        </svg>
+                        {isRegeneratingThis ? "Regenerating..." : "Regenerate"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyResponse(msg.text, idx)}
+                        style={iconButtonStyle}
+                      >
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                        {copiedMessageIndex === idx ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
 
             {isLoading && (
               <div
@@ -474,22 +649,30 @@ function App() {
               />
               <button
                 type="submit"
-                disabled={!question.trim() || isLoading}
+                disabled={!question.trim() || isLoading || regeneratingIndex !== null}
                 style={{
                   minWidth: "96px",
                   padding: "0.95rem 1.45rem",
                   borderRadius: "1rem",
                   border: "1px solid rgba(255,255,255,0.22)",
-                  background: isLoading
-                    ? "rgba(75, 85, 99, 0.58)"
-                    : "linear-gradient(135deg, #38bdf8, #818cf8)",
-                  color: isLoading ? "#cbd5e1" : "#020617",
+                  background:
+                    isLoading || regeneratingIndex !== null
+                      ? "rgba(75, 85, 99, 0.58)"
+                      : "linear-gradient(135deg, #38bdf8, #818cf8)",
+                  color:
+                    isLoading || regeneratingIndex !== null
+                      ? "#cbd5e1"
+                      : "#020617",
                   fontWeight: 600,
                   fontSize: "0.95rem",
-                  cursor: isLoading || !question.trim() ? "default" : "pointer",
-                  boxShadow: isLoading
-                    ? "none"
-                    : "0 6px 18px rgba(56, 189, 248, 0.38)",
+                  cursor:
+                    isLoading || regeneratingIndex !== null || !question.trim()
+                      ? "default"
+                      : "pointer",
+                  boxShadow:
+                    isLoading || regeneratingIndex !== null
+                      ? "none"
+                      : "0 6px 18px rgba(56, 189, 248, 0.38)",
                   opacity: !question.trim() ? 0.5 : 1,
                   flexShrink: 0,
                 }}
