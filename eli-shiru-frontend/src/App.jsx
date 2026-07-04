@@ -80,7 +80,8 @@ function App() {
         ...prev,
         {
           role: "assistant",
-          text: "Sorry, something went wrong talking to the backend. Check the console and that uvicorn is running.",
+          text:
+            "Sorry, something went wrong talking to the backend. Check the console and that uvicorn is running.",
           level: currentLevel,
           question: currentQuestion,
           isError: true,
@@ -155,7 +156,8 @@ function App() {
           idx === assistantIndex
             ? {
                 ...msg,
-                text: "Sorry, something went wrong talking to the backend. Check the console and that uvicorn is running.",
+                text:
+                  "Sorry, something went wrong talking to the backend. Check the console and that uvicorn is running.",
                 isError: true,
               }
             : msg
@@ -183,6 +185,8 @@ function App() {
     boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
     transition: "all 0.2s ease",
   };
+
+  const composerDisabled = isLoading || regeneratingIndex !== null;
 
   return (
     <div
@@ -214,6 +218,16 @@ function App() {
         @keyframes shimmer {
           0% { background-position: 0% 50%; }
           100% { background-position: 200% 50%; }
+        }
+        @keyframes typingBounce {
+          0%, 80%, 100% {
+            transform: scale(0.7);
+            opacity: 0.4;
+          }
+          40% {
+            transform: scale(1);
+            opacity: 1;
+          }
         }
         * {
           box-sizing: border-box;
@@ -507,35 +521,63 @@ function App() {
               <div
                 style={{
                   alignSelf: "flex-start",
-                  maxWidth: "78%",
+                  maxWidth: "60%",
                   display: "flex",
                   flexDirection: "column",
-                  gap: "0.25rem",
+                  gap: "0.35rem",
                 }}
               >
                 <div
                   style={{
-                    padding: "0.9rem 1.1rem",
-                    borderRadius: "1.25rem",
-                    borderBottomLeftRadius: "0.35rem",
-                    background: "rgba(2, 6, 23, 0.42)",
-                    border: "1px solid rgba(255, 255, 255, 0.10)",
-                    color: "rgba(148, 163, 184, 0.85)",
-                    fontSize: "0.95rem",
-                    backdropFilter: "blur(10px)",
-                    WebkitBackdropFilter: "blur(10px)",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "0.35rem",
+                    padding: "0.6rem 0.9rem",
+                    borderRadius: "9999px",
+                    background: "rgba(15, 23, 42, 0.85)",
+                    border: "1px solid rgba(148, 163, 184, 0.5)",
+                    backdropFilter: "blur(16px)",
+                    WebkitBackdropFilter: "blur(16px)",
                   }}
                 >
-                  Thinking…
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "9999px",
+                      backgroundColor: "#94a3b8",
+                      animation: "typingBounce 1.4s infinite ease-in-out",
+                      animationDelay: "-0.32s",
+                    }}
+                  />
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "9999px",
+                      backgroundColor: "#94a3b8",
+                      animation: "typingBounce 1.4s infinite ease-in-out",
+                      animationDelay: "-0.16s",
+                    }}
+                  />
+                  <span
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "9999px",
+                      backgroundColor: "#94a3b8",
+                      animation: "typingBounce 1.4s infinite ease-in-out",
+                    }}
+                  />
                 </div>
                 <span
                   style={{
-                    fontSize: "0.72rem",
-                    color: "rgba(148, 163, 184, 0.55)",
-                    padding: "0 0.35rem",
+                    fontSize: "0.78rem",
+                    color: "rgba(148, 163, 184, 0.85)",
+                    paddingLeft: "0.25rem",
                   }}
                 >
-                  ELI-Shiru · {level}
+                  ELI-Shiru is thinking…
                 </span>
               </div>
             )}
@@ -581,6 +623,7 @@ function App() {
                     type="button"
                     onClick={() => setLevel(lvl)}
                     aria-pressed={active}
+                    disabled={composerDisabled}
                     style={{
                       padding: "0.46rem 1rem",
                       borderRadius: "9999px",
@@ -595,11 +638,12 @@ function App() {
                       color: "#f1f5f9",
                       fontSize: "0.82rem",
                       fontWeight: 500,
-                      cursor: "pointer",
+                      cursor: composerDisabled ? "default" : "pointer",
                       transition: "all 0.25s ease",
                       boxShadow: active
                         ? "0 4px 14px rgba(56, 189, 248, 0.28), inset 0 1px 0 rgba(255,255,255,0.25)"
                         : "inset 0 1px 0 rgba(255,255,255,0.06)",
+                      opacity: composerDisabled ? 0.6 : 1,
                     }}
                   >
                     {lvl}
@@ -628,6 +672,7 @@ function App() {
                   }
                 }}
                 rows={3}
+                disabled={composerDisabled}
                 style={{
                   flex: 1,
                   minWidth: 0,
@@ -637,47 +682,46 @@ function App() {
                   border: "1px solid rgba(255, 255, 255, 0.22)",
                   background:
                     "linear-gradient(180deg, rgba(15, 23, 42, 0.88) 0%, rgba(2, 6, 23, 0.76) 100%)",
-                  color: "#f8fafc",
+                  color: composerDisabled ? "#9ca3af" : "#f8fafc",
                   resize: "none",
                   fontSize: "0.96rem",
                   outline: "none",
                   fontFamily: "inherit",
                   boxShadow:
                     "inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(255,255,255,0.02)",
+                  opacity: composerDisabled ? 0.7 : 1,
+                  cursor: composerDisabled ? "default" : "text",
                 }}
-                placeholder="Ask a follow-up question…"
+                placeholder={
+                  composerDisabled
+                    ? "ELI-Shiru is thinking…"
+                    : "Ask a follow-up question…"
+                }
               />
               <button
                 type="submit"
-                disabled={!question.trim() || isLoading || regeneratingIndex !== null}
+                disabled={!question.trim() || composerDisabled}
                 style={{
                   minWidth: "96px",
                   padding: "0.95rem 1.45rem",
                   borderRadius: "1rem",
                   border: "1px solid rgba(255,255,255,0.22)",
-                  background:
-                    isLoading || regeneratingIndex !== null
-                      ? "rgba(75, 85, 99, 0.58)"
-                      : "linear-gradient(135deg, #38bdf8, #818cf8)",
-                  color:
-                    isLoading || regeneratingIndex !== null
-                      ? "#cbd5e1"
-                      : "#020617",
+                  background: composerDisabled
+                    ? "rgba(75, 85, 99, 0.58)"
+                    : "linear-gradient(135deg, #38bdf8, #818cf8)",
+                  color: composerDisabled ? "#cbd5e1" : "#020617",
                   fontWeight: 600,
                   fontSize: "0.95rem",
                   cursor:
-                    isLoading || regeneratingIndex !== null || !question.trim()
-                      ? "default"
-                      : "pointer",
-                  boxShadow:
-                    isLoading || regeneratingIndex !== null
-                      ? "none"
-                      : "0 6px 18px rgba(56, 189, 248, 0.38)",
+                    !question.trim() || composerDisabled ? "default" : "pointer",
+                  boxShadow: composerDisabled
+                    ? "none"
+                    : "0 6px 18px rgba(56, 189, 248, 0.38)",
                   opacity: !question.trim() ? 0.5 : 1,
                   flexShrink: 0,
                 }}
               >
-                {isLoading ? "..." : "Send"}
+                {composerDisabled ? "…" : "Send"}
               </button>
             </form>
           </div>
