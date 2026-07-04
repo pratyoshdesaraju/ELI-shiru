@@ -85,11 +85,10 @@ function App() {
   return (
     <div
       style={{
-        minHeight: "100vh",
+        height: "100vh",
         width: "100%",
         position: "relative",
-        overflowX: "hidden",
-        overflowY: "hidden",
+        overflow: "hidden",
         background:
           "linear-gradient(135deg, #0a0f1f 0%, #05070f 50%, #0a0f1f 100%)",
         color: "#f1f5f9",
@@ -120,11 +119,11 @@ function App() {
         html, body, #root {
           margin: 0;
           width: 100%;
-          min-height: 100%;
+          height: 100%;
           overflow: hidden;
         }
         ::placeholder {
-          color: rgba(148, 163, 184, 0.5);
+          color: rgba(203, 213, 225, 0.5);
         }
         ::-webkit-scrollbar {
           width: 8px;
@@ -176,18 +175,19 @@ function App() {
       <div
         style={{
           width: "100%",
-          minHeight: "100vh",
+          height: "100vh",
           padding: "clamp(1rem, 2vw, 2rem)",
           display: "flex",
           flexDirection: "column",
+          gap: "1rem",
           zIndex: 1,
           position: "relative",
           boxSizing: "border-box",
+          overflow: "hidden",
         }}
       >
         <header
           style={{
-            marginBottom: "1rem",
             textAlign: "center",
             flexShrink: 0,
           }}
@@ -199,7 +199,7 @@ function App() {
               letterSpacing: "-0.03em",
               lineHeight: 1.3,
               padding: "0.15em 0",
-              marginBottom: "0.25rem",
+              margin: "0 0 0.25rem 0",
               display: "inline-block",
               backgroundImage:
                 "linear-gradient(120deg, #ffffff 0%, #93c5fd 25%, #c4b5fd 50%, #38bdf8 75%, #ffffff 100%)",
@@ -228,6 +228,7 @@ function App() {
         <section
           style={{
             flex: 1,
+            minHeight: 0,
             width: "100%",
             minWidth: 0,
             display: "flex",
@@ -241,22 +242,19 @@ function App() {
             boxShadow:
               "0 8px 40px rgba(0, 0, 0, 0.4), 0 1.5px 0 rgba(255,255,255,0.2) inset",
             overflow: "hidden",
-            minHeight: 0,
-            boxSizing: "border-box",
           }}
         >
           <div
             ref={scrollRef}
             style={{
               flex: 1,
+              minHeight: 0,
               overflowY: "auto",
               overflowX: "hidden",
               padding: "1.5rem",
               display: "flex",
               flexDirection: "column",
               gap: "1rem",
-              minHeight: 0,
-              minWidth: 0,
             }}
           >
             {messages.length === 0 && !isLoading && (
@@ -370,16 +368,16 @@ function App() {
 
           <div
             style={{
-              borderTop: "1px solid rgba(255, 255, 255, 0.10)",
-              padding: "1rem 1.5rem 1.25rem",
+              flexShrink: 0,
+              borderTop: "1px solid rgba(255, 255, 255, 0.16)",
+              padding: "1rem 1.5rem 1.4rem",
               display: "flex",
               flexDirection: "column",
-              gap: "0.85rem",
-              flexShrink: 0,
-              background: "rgba(255, 255, 255, 0.03)",
-              backdropFilter: "blur(16px)",
-              WebkitBackdropFilter: "blur(16px)",
-              boxSizing: "border-box",
+              gap: "0.9rem",
+              background:
+                "linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%)",
+              backdropFilter: "blur(20px)",
+              WebkitBackdropFilter: "blur(20px)",
             }}
           >
             <div
@@ -393,8 +391,8 @@ function App() {
             >
               <span
                 style={{
-                  fontSize: "0.8rem",
-                  color: "rgba(148, 163, 184, 0.72)",
+                  fontSize: "0.82rem",
+                  color: "rgba(203, 213, 225, 0.78)",
                   marginRight: "0.2rem",
                 }}
               >
@@ -409,14 +407,14 @@ function App() {
                     onClick={() => setLevel(lvl)}
                     aria-pressed={active}
                     style={{
-                      padding: "0.42rem 1rem",
+                      padding: "0.46rem 1rem",
                       borderRadius: "9999px",
                       border: active
                         ? "1px solid rgba(56, 189, 248, 0.9)"
-                        : "1px solid rgba(255, 255, 255, 0.16)",
+                        : "1px solid rgba(255, 255, 255, 0.18)",
                       background: active
                         ? "linear-gradient(135deg, rgba(56,189,248,0.42), rgba(139,92,246,0.42))"
-                        : "rgba(255, 255, 255, 0.06)",
+                        : "rgba(255, 255, 255, 0.08)",
                       backdropFilter: "blur(12px)",
                       WebkitBackdropFilter: "blur(12px)",
                       color: "#f1f5f9",
@@ -426,7 +424,7 @@ function App() {
                       transition: "all 0.25s ease",
                       boxShadow: active
                         ? "0 4px 14px rgba(56, 189, 248, 0.28), inset 0 1px 0 rgba(255,255,255,0.25)"
-                        : "inset 0 1px 0 rgba(255,255,255,0.05)",
+                        : "inset 0 1px 0 rgba(255,255,255,0.06)",
                     }}
                   >
                     {lvl}
@@ -440,7 +438,7 @@ function App() {
               style={{
                 display: "flex",
                 gap: "0.75rem",
-                alignItems: "flex-end",
+                alignItems: "stretch",
                 width: "100%",
                 minWidth: 0,
               }}
@@ -454,21 +452,23 @@ function App() {
                     handleSubmit(e);
                   }
                 }}
-                rows={2}
+                rows={3}
                 style={{
                   flex: 1,
                   minWidth: 0,
-                  padding: "0.82rem 1rem",
+                  minHeight: "72px",
+                  padding: "1rem",
                   borderRadius: "1rem",
-                  border: "1px solid rgba(255, 255, 255, 0.18)",
-                  backgroundColor: "rgba(2, 6, 23, 0.45)",
-                  color: "#f1f5f9",
+                  border: "1px solid rgba(255, 255, 255, 0.22)",
+                  background:
+                    "linear-gradient(180deg, rgba(15, 23, 42, 0.88) 0%, rgba(2, 6, 23, 0.76) 100%)",
+                  color: "#f8fafc",
                   resize: "none",
-                  fontSize: "0.95rem",
+                  fontSize: "0.96rem",
                   outline: "none",
                   fontFamily: "inherit",
-                  boxSizing: "border-box",
-                  boxShadow: "inset 0 2px 8px rgba(0,0,0,0.28)",
+                  boxShadow:
+                    "inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(255,255,255,0.02)",
                 }}
                 placeholder="Ask a follow-up question…"
               />
@@ -476,7 +476,8 @@ function App() {
                 type="submit"
                 disabled={!question.trim() || isLoading}
                 style={{
-                  padding: "0.82rem 1.45rem",
+                  minWidth: "96px",
+                  padding: "0.95rem 1.45rem",
                   borderRadius: "1rem",
                   border: "1px solid rgba(255,255,255,0.22)",
                   background: isLoading
@@ -493,7 +494,7 @@ function App() {
                   flexShrink: 0,
                 }}
               >
-                {isLoading ? "…" : "Send"}
+                {isLoading ? "..." : "Send"}
               </button>
             </form>
           </div>
