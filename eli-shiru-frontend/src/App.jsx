@@ -10,7 +10,11 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [copiedMessageIndex, setCopiedMessageIndex] = useState(null);
   const [regeneratingIndex, setRegeneratingIndex] = useState(null);
+  const [editingUserIndex, setEditingUserIndex] = useState(null);
+  const [editingUserText, setEditingUserText] = useState("");
+  const [levelPickerIndex, setLevelPickerIndex] = useState(null);
   const scrollRef = useRef(null);
+  const composerRef = useRef(null);
 
   useEffect(() => {
     document.title = "ELI-Shiru";
@@ -21,6 +25,20 @@ function App() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages, isLoading, regeneratingIndex]);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        composerRef.current?.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleGlobalKeyDown);
+    };
+  }, []);
 
   const fetchExplanation = async (questionText, levelValue) => {
     const res = await fetch("http://127.0.0.1:8000/explain", {
@@ -42,20 +60,15 @@ function App() {
     return data.explanation || "No explanation returned.";
   };
 
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-
-    if (!question.trim() || isLoading || regeneratingIndex !== null) {
+  const submitQuestion = async (questionText, levelValue) => {
+    if (!questionText.trim() || isLoading || regeneratingIndex !== null) {
       return;
     }
 
-    const currentQuestion = question;
-    const currentLevel = level;
-
     const userMessage = {
       role: "user",
-      text: currentQuestion,
-      level: currentLevel,
+      text: questionText,
+      level: levelValue,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -63,15 +76,15 @@ function App() {
     setIsLoading(true);
 
     try {
-      const explanation = await fetchExplanation(currentQuestion, currentLevel);
+      const explanation = await fetchExplanation(questionText, levelValue);
 
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           text: explanation,
-          level: currentLevel,
-          question: currentQuestion,
+          level: levelValue,
+          question: questionText,
         },
       ]);
     } catch (err) {
@@ -82,14 +95,19 @@ function App() {
           role: "assistant",
           text:
             "Sorry, something went wrong talking to the backend. Check the console and that uvicorn is running.",
-          level: currentLevel,
-          question: currentQuestion,
+          level: levelValue,
+          question: questionText,
           isError: true,
         },
       ]);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    await submitQuestion(question, level);
   };
 
   const handleCopyResponse = async (text, index) => {
@@ -166,6 +184,105 @@ function App() {
     } finally {
       setRegeneratingIndex(null);
     }
+  };
+
+  const handleAnswerAtLevel = async (assistantIndex, newLevel) => {
+    if (isLoading || regeneratingIndex !== null) {
+      return;
+    }
+
+    const assistantMessage = messages[assistantIndex];
+    if (!assistantMessage || assistantMessage.role !== "assistant") {
+      return;
+    }
+
+    let relatedQuestion = assistantMessage.question;
+    if (!relatedQuestion) {
+      for (let i = assistantIndex - 1; i >= 0; i -= 1) {
+        if (messages[i].role === "user") {
+          relatedQuestion = messages[i].text;
+          break;
+        }
+      }
+    }
+
+    if (!relatedQuestion) {
+      return;
+    }
+
+    setLevelPickerIndex(null);
+    await submitQuestion(relatedQuestion, newLevel);
+  };
+
+  const startEditingUserMessage = (index, text) => {
+    setEditingUserIndex(index);
+    setEditingUserText(text);
+  };
+
+  const cancelEditingUserMessage = () => {
+    setEditingUserIndex(null);
+    setEditingUserText("");
+  };
+
+  const resendEditedQuestion = async (originalLevel) => {
+    if (!editingUserText.trim()) {
+      return;
+    }
+
+    const textToSubmit = editingUserText.trim();
+    cancelEditingUserMessage();
+    await submitQuestion(textToSubmit, originalLevel);
+  };
+
+  const downloadFile = (content, fileName, mimeType) => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+  };
+
+  const exportAsText = () => {
+    const lines = [];
+    lines.push("ELI-Shiru Conversation");
+    lines.push("");
+    messages.forEach((msg) => {
+      const speaker = msg.role === "user" ? "You" : "ELI-Shiru";
+      lines.push(`${speaker} (${msg.level})`);
+      lines.push(msg.text);
+      lines.push("");
+    });
+    downloadFile(
+      lines.join("\n"),
+      `eli-shiru-conversation-${new Date().toISOString().slice(0, 10)}.txt`,
+      "text/plain;charset=utf-8"
+    );
+  };
+
+  const exportAsMarkdown = () => {
+    const lines = [];
+    lines.push("# ELI-Shiru Conversation");
+    lines.push("");
+    lines.push(`Exported: ${new Date().toLocaleString()}`);
+    lines.push("");
+
+    messages.forEach((msg) => {
+      const speaker = msg.role === "user" ? "You" : "ELI-Shiru";
+      lines.push(`## ${speaker} · ${msg.level}`);
+      lines.push("");
+      lines.push(msg.text);
+      lines.push("");
+    });
+
+    downloadFile(
+      lines.join("\n"),
+      `eli-shiru-conversation-${new Date().toISOString().slice(0, 10)}.md`,
+      "text/markdown;charset=utf-8"
+    );
   };
 
   const iconButtonStyle = {
@@ -306,6 +423,7 @@ function App() {
           style={{
             textAlign: "center",
             flexShrink: 0,
+            position: "relative",
           }}
         >
           <h1
@@ -339,6 +457,25 @@ function App() {
           >
             Ask, follow up, and adjust the depth anytime.
           </p>
+
+          <div
+            style={{
+              position: "absolute",
+              right: 0,
+              top: 0,
+              display: "flex",
+              gap: "0.5rem",
+              flexWrap: "wrap",
+              justifyContent: "flex-end",
+            }}
+          >
+            <button type="button" onClick={exportAsText} style={iconButtonStyle}>
+              Export .txt
+            </button>
+            <button type="button" onClick={exportAsMarkdown} style={iconButtonStyle}>
+              Export .md
+            </button>
+          </div>
         </header>
 
         <section
@@ -388,13 +525,15 @@ function App() {
 
             {messages.map((msg, idx) => {
               const isAssistant = msg.role === "assistant";
+              const isUser = msg.role === "user";
               const isRegeneratingThis = regeneratingIndex === idx;
+              const isEditingThisUser = editingUserIndex === idx;
 
               return (
                 <div
                   key={idx}
                   style={{
-                    alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                    alignSelf: isUser ? "flex-end" : "flex-start",
                     maxWidth: "78%",
                     display: "flex",
                     flexDirection: "column",
@@ -402,50 +541,126 @@ function App() {
                     minWidth: 0,
                   }}
                 >
-                  <div
-                    style={{
-                      padding: "0.9rem 1.1rem",
-                      borderRadius: "1.25rem",
-                      borderBottomRightRadius:
-                        msg.role === "user" ? "0.35rem" : "1.25rem",
-                      borderBottomLeftRadius:
-                        msg.role === "assistant" ? "0.35rem" : "1.25rem",
-                      background:
-                        msg.role === "user"
+                  {isUser && isEditingThisUser ? (
+                    <div
+                      style={{
+                        padding: "0.9rem",
+                        borderRadius: "1.25rem",
+                        background:
+                          "linear-gradient(135deg, rgba(56,189,248,0.22), rgba(139,92,246,0.22))",
+                        border: "1px solid rgba(56, 189, 248, 0.3)",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "0.7rem",
+                      }}
+                    >
+                      <textarea
+                        value={editingUserText}
+                        onChange={(e) => setEditingUserText(e.target.value)}
+                        rows={3}
+                        style={{
+                          width: "100%",
+                          padding: "0.9rem",
+                          borderRadius: "0.95rem",
+                          border: "1px solid rgba(255,255,255,0.18)",
+                          background: "rgba(2, 6, 23, 0.5)",
+                          color: "#f8fafc",
+                          resize: "vertical",
+                          fontSize: "0.95rem",
+                          outline: "none",
+                          fontFamily: "inherit",
+                        }}
+                      />
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "0.5rem",
+                          justifyContent: "flex-end",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <button
+                          type="button"
+                          onClick={cancelEditingUserMessage}
+                          style={iconButtonStyle}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => resendEditedQuestion(msg.level)}
+                          style={{
+                            ...iconButtonStyle,
+                            background:
+                              "linear-gradient(135deg, rgba(56,189,248,0.28), rgba(129,140,248,0.28))",
+                          }}
+                        >
+                          Resend
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        padding: "0.9rem 1.1rem",
+                        borderRadius: "1.25rem",
+                        borderBottomRightRadius: isUser ? "0.35rem" : "1.25rem",
+                        borderBottomLeftRadius: isAssistant ? "0.35rem" : "1.25rem",
+                        background: isUser
                           ? "linear-gradient(135deg, rgba(56,189,248,0.34), rgba(139,92,246,0.34))"
                           : msg.isError
                           ? "rgba(239, 68, 68, 0.14)"
                           : "rgba(2, 6, 23, 0.42)",
-                      border:
-                        msg.role === "user"
+                        border: isUser
                           ? "1px solid rgba(56, 189, 248, 0.38)"
                           : msg.isError
                           ? "1px solid rgba(239, 68, 68, 0.35)"
                           : "1px solid rgba(255, 255, 255, 0.10)",
-                      backdropFilter: "blur(10px)",
-                      WebkitBackdropFilter: "blur(10px)",
-                      whiteSpace: "pre-wrap",
-                      fontSize: "0.98rem",
-                      lineHeight: 1.58,
-                      color: "#f1f5f9",
-                      boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
-                      wordBreak: "break-word",
-                      overflowWrap: "anywhere",
-                    }}
-                  >
-                    {msg.text}
-                  </div>
+                        backdropFilter: "blur(10px)",
+                        WebkitBackdropFilter: "blur(10px)",
+                        whiteSpace: "pre-wrap",
+                        fontSize: "0.98rem",
+                        lineHeight: 1.58,
+                        color: "#f1f5f9",
+                        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.07)",
+                        wordBreak: "break-word",
+                        overflowWrap: "anywhere",
+                      }}
+                    >
+                      {msg.text}
+                    </div>
+                  )}
 
                   <span
                     style={{
                       fontSize: "0.72rem",
                       color: "rgba(148, 163, 184, 0.55)",
-                      alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
+                      alignSelf: isUser ? "flex-end" : "flex-start",
                       padding: "0 0.35rem",
                     }}
                   >
-                    {msg.role === "user" ? "You" : "ELI-Shiru"} · {msg.level}
+                    {isUser ? "You" : "ELI-Shiru"} · {msg.level}
                   </span>
+
+                  {isUser && !isEditingThisUser && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.5rem",
+                        flexWrap: "wrap",
+                        padding: "0 0.25rem",
+                        justifyContent: "flex-end",
+                      }}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => startEditingUserMessage(idx, msg.text)}
+                        style={iconButtonStyle}
+                      >
+                        Edit & resend
+                      </button>
+                    </div>
+                  )}
 
                   {isAssistant && (
                     <div
@@ -511,6 +726,50 @@ function App() {
                         </svg>
                         {copiedMessageIndex === idx ? "Copied" : "Copy"}
                       </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setLevelPickerIndex((current) =>
+                            current === idx ? null : idx
+                          )
+                        }
+                        style={iconButtonStyle}
+                      >
+                        Answer at another level
+                      </button>
+                    </div>
+                  )}
+
+                  {isAssistant && levelPickerIndex === idx && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "0.45rem",
+                        flexWrap: "wrap",
+                        padding: "0.3rem 0.25rem 0",
+                      }}
+                    >
+                      {EXPLANATION_LEVELS.map((lvl) => (
+                        <button
+                          key={`${idx}-${lvl}`}
+                          type="button"
+                          onClick={() => handleAnswerAtLevel(idx, lvl)}
+                          disabled={composerDisabled}
+                          style={{
+                            ...iconButtonStyle,
+                            padding: "0.38rem 0.85rem",
+                            opacity: composerDisabled ? 0.6 : 1,
+                            cursor: composerDisabled ? "default" : "pointer",
+                            background:
+                              msg.level === lvl
+                                ? "linear-gradient(135deg, rgba(56,189,248,0.28), rgba(139,92,246,0.28))"
+                                : "rgba(255,255,255,0.05)",
+                          }}
+                        >
+                          {lvl}
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -663,6 +922,7 @@ function App() {
               }}
             >
               <textarea
+                ref={composerRef}
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
                 onKeyDown={(e) => {
@@ -724,6 +984,16 @@ function App() {
                 {composerDisabled ? "…" : "Send"}
               </button>
             </form>
+
+            <p
+              style={{
+                margin: 0,
+                fontSize: "0.75rem",
+                color: "rgba(148, 163, 184, 0.62)",
+              }}
+            >
+              Shortcuts: Enter to send, Shift+Enter for newline, Cmd/Ctrl+K to focus the composer.
+            </p>
           </div>
         </section>
       </div>
