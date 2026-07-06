@@ -10,3 +10,5 @@
 /dataSources.local.xml
 # JetBrains IDE
 .idea/
+eli-shiru-backend/.venv/
+**/__pycache__/
