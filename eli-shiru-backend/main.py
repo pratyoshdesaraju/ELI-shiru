@@ -1,23 +1,31 @@
+# eli-shiru-backend/main.py
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import httpx
 
+from database import init_db
+
+
 class ExplainRequest(BaseModel):
     question: str
     level: str
+
 
 class ExplainResponse(BaseModel):
     level: str
     question: str
     explanation: str
 
+
 app = FastAPI()
+
 
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,9 +35,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
+
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "eli-shiru-backend"}
+
 
 def build_prompt(question: str, level: str) -> str:
     if level == "ELI1":
@@ -71,6 +86,7 @@ def build_prompt(question: str, level: str) -> str:
     )
     return prompt
 
+
 async def call_ollama(prompt: str) -> str:
     """
     Call Ollama's /api/generate endpoint and collect the streamed 'response' text.
@@ -80,7 +96,6 @@ async def call_ollama(prompt: str) -> str:
 
     try:
         async with httpx.AsyncClient(timeout=None) as client:
-            # stream=True so we can iterate over the chunks
             async with client.stream(
                 "POST",
                 "http://127.0.0.1:11434/api/generate",
@@ -99,7 +114,6 @@ async def call_ollama(prompt: str) -> str:
                     try:
                         data = httpx.Response(200, content=line).json()
                     except Exception:
-                        # Ignore malformed chunks
                         continue
                     chunk = data.get("response")
                     if chunk:
@@ -120,6 +134,7 @@ async def call_ollama(prompt: str) -> str:
         )
 
     return text
+
 
 @app.post("/explain", response_model=ExplainResponse)
 async def explain(req: ExplainRequest):
