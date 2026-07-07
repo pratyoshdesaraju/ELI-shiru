@@ -10,7 +10,7 @@ This document presents the Phase 2 backlog for ELI-Shiru from the product owner'
 
 | Story | Title | Status |
 |---|---|---|
-| P0-01 | Define collection, document, and chunk domain models | 🟡 In Progress |
+| P0-01 | Define collection, document, and chunk domain models | ✅ Done |
 | P0-02 | Implement deterministic local file storage | 🔲 Not Started |
 | P0-03 | Build collection and document upload APIs | 🔲 Not Started |
 | P0-04 | Add background indexing orchestration | 🔲 Not Started |
@@ -39,7 +39,7 @@ This document presents the Phase 2 backlog for ELI-Shiru from the product owner'
 
 ### P0-01: Define collection, document, and chunk domain models
 
-**Status:** 🟡 In Progress
+**Status:** ✅ Done
 
 **Description**
 
