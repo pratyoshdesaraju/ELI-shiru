@@ -1,14 +1,43 @@
+# /eli-shiru/.gitignore
+
 # Default ignored files
 /shelf/
 /workspace.xml
+
 # Editor-based HTTP Client requests
 /httpRequests/
+
 # Ignored default folder with query files
 /queries/
+
 # Datasource local storage ignored files
 /dataSources/
 /dataSources.local.xml
+
 # JetBrains IDE
 .idea/
+
+# Python
 eli-shiru-backend/.venv/
 **/__pycache__/
+*.pyc
+*.pyo
+
+# Local SQLite databases
+*.db
+*.db-journal
+
+# Uploaded files - user study materials, never commit
+eli-shiru-backend/uploads/
+
+# Environment / secrets
+.env
+eli-shiru-backend/.env
+
+# Code crawler
+# Local helper scripts and snapshots
+script.py
+all_repo_code.txt
+
+# OS noise
+.DS_Store

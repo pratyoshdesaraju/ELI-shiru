@@ -5,6 +5,12 @@ from pydantic import BaseModel
 import httpx
 
 from database import init_db
+# Importing the models here (even though they're unused directly in this file)
+# forces SQLModel to register Collection, Document, and Chunk with its metadata
+# before init_db() runs. Without this import, create_all() would only see
+# whatever tables happen to already be registered, and your new tables
+# would silently never get created.
+from models import Collection, Document, DocumentStatus, Chunk
 
 
 class ExplainRequest(BaseModel):
@@ -20,12 +26,7 @@ class ExplainResponse(BaseModel):
 
 app = FastAPI()
 
-
-origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-]
-
+origins = ["http://localhost:5173", "http://127.0.0.1:5173"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,51 +50,50 @@ def health_check():
 def build_prompt(question: str, level: str) -> str:
     if level == "ELI1":
         style_instruction = (
-            "Explain this to someone with about 1 year of experience in the relevant field. "
-            "Assume they know the basics and common terminology, but still need simple, direct explanations "
-            "and one concrete example."
+            "Explain this to someone with about 1 year of experience in the "
+            "relevant field. Assume they know the basics and common terminology, "
+            "but still need simple, direct explanations and one concrete example."
         )
     elif level == "ELI5":
         style_instruction = (
-            "Explain this to someone with about 5 years of experience in the relevant field. "
-            "Assume they are comfortable with core concepts and standard terminology. "
-            "Give a practical explanation, include important details, and show how it is used in real work."
+            "Explain this to someone with about 5 years of experience in the "
+            "relevant field. Assume they are comfortable with core concepts and "
+            "standard terminology. Give a practical explanation, include important "
+            "details, and show how it is used in real work."
         )
     elif level == "ELI10":
         style_instruction = (
-            "Explain this to someone with about 10 years of experience in the relevant field. "
-            "Use precise professional language, discuss design considerations, and connect the concept "
-            "to deeper implementation details, trade-offs, or architecture."
+            "Explain this to someone with about 10 years of experience in the "
+            "relevant field. Use precise professional language, discuss design "
+            "considerations, and connect the concept to deeper implementation "
+            "details, trade-offs, or architecture."
         )
     elif level == "ELI15":
         style_instruction = (
-            "Explain this to someone with about 15 years of experience in the relevant field. "
-            "Assume deep professional expertise. Focus on subtleties, edge cases, trade-offs, failure modes, "
-            "and how experts reason about this concept in practice."
+            "Explain this to someone with about 15 years of experience in the "
+            "relevant field. Assume deep professional expertise. Focus on "
+            "subtleties, edge cases, trade-offs, failure modes, and how experts "
+            "reason about this concept in practice."
         )
     else:
-        style_instruction = (
-            "Explain this clearly based on the experience level requested."
-        )
+        style_instruction = "Explain this clearly based on the experience level requested."
 
     prompt = (
-        f"{style_instruction}\n\n"
-        f"Topic/question:\n{question}\n\n"
+        f"{style_instruction}\n"
+        f"Topic/question: {question}\n"
         f"Infer the professional field from the question. "
-        f"For example, if the question is about arrays, treat the field as software engineering/computer science. "
-        f"Adjust the explanation to match the requested years of experience in that field. "
-        f"Write one cohesive explanation at the requested level."
+        f"For example, if the question is about arrays, treat the field as "
+        f"software engineering/computer science. "
+        f"Adjust the explanation to match the requested years of experience in "
+        f"that field. Write one cohesive explanation at the requested level."
     )
     return prompt
 
 
 async def call_ollama(prompt: str) -> str:
-    """
-    Call Ollama's /api/generate endpoint and collect the streamed 'response' text.
-    """
+    """Call Ollama's /api/generate endpoint and collect the streamed response text."""
     model_name = "llama3"
     generated = []
-
     try:
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream(
@@ -107,7 +107,6 @@ async def call_ollama(prompt: str) -> str:
                         status_code=resp.status_code,
                         detail=f"Ollama returned {resp.status_code}: {text.decode(errors='ignore')}",
                     )
-
                 async for line in resp.aiter_lines():
                     if not line.strip():
                         continue
@@ -121,18 +120,11 @@ async def call_ollama(prompt: str) -> str:
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=503,
-            detail=f"Error talking to Ollama: {e}",
-        )
+        raise HTTPException(status_code=503, detail=f"Error talking to Ollama: {e}")
 
     text = "".join(generated).strip()
     if not text:
-        raise HTTPException(
-            status_code=500,
-            detail="Ollama returned an empty response.",
-        )
-
+        raise HTTPException(status_code=500, detail="Ollama returned an empty response.")
     return text
 
 
@@ -140,9 +132,4 @@ async def call_ollama(prompt: str) -> str:
 async def explain(req: ExplainRequest):
     prompt = build_prompt(req.question, req.level)
     explanation = await call_ollama(prompt)
-
-    return ExplainResponse(
-        level=req.level,
-        question=req.question,
-        explanation=explanation,
-    )
+    return ExplainResponse(level=req.level, question=req.question, explanation=explanation)
