@@ -11,7 +11,7 @@ This document presents the Phase 2 backlog for ELI-Shiru from the product owner'
 | Story | Title | Status |
 |---|---|---|
 | P0-01 | Define collection, document, and chunk domain models | ✅ Done |
-| P0-02 | Implement deterministic local file storage | 🔲 Not Started |
+| P0-02 | Implement deterministic local file storage | ✅ Done |
 | P0-03 | Build collection and document upload APIs | 🔲 Not Started |
 | P0-04 | Add background indexing orchestration | 🔲 Not Started |
 | P0-05 | Implement page-aware PDF extraction | 🔲 Not Started |
@@ -57,7 +57,7 @@ As the product owner, this story exists so ELI-Shiru has a reliable, structured 
 
 ### P0-02: Implement deterministic local file storage
 
-**Status:** 🔲 Not Started
+**Status:** ✅ Done
 
 **Description**
 

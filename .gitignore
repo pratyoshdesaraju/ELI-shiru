@@ -41,3 +41,6 @@ all_repo_code.txt
 
 # OS noise
 .DS_Store
+
+# Personal working notes - not for repo
+docs/phase2-notes.md
