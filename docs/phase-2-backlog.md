@@ -74,7 +74,7 @@ As the product owner, this story exists to protect the "local-first, offline-fir
 
 ### P0-03: Build collection and document upload APIs
 
-**Status:** 🔲 Not Started
+**Status:** 🟡 In Progress
 
 **Description**
 
