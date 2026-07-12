@@ -5,12 +5,8 @@ from pydantic import BaseModel
 import httpx
 
 from database import init_db
-# Importing the models here (even though they're unused directly in this file)
-# forces SQLModel to register Collection, Document, and Chunk with its metadata
-# before init_db() runs. Without this import, create_all() would only see
-# whatever tables happen to already be registered, and your new tables
-# would silently never get created.
 from models import Collection, Document, DocumentStatus, Chunk
+from routers.collections import router as collections_router
 
 
 class ExplainRequest(BaseModel):
@@ -36,6 +32,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(collections_router)
+
 
 @app.on_event("startup")
 def on_startup():
@@ -50,48 +48,47 @@ def health_check():
 def build_prompt(question: str, level: str) -> str:
     if level == "ELI1":
         style_instruction = (
-            "Explain this to someone with about 1 year of experience in the "
-            "relevant field. Assume they know the basics and common terminology, "
-            "but still need simple, direct explanations and one concrete example."
+            "Explain this to someone with about 1 year of experience in the relevant "
+            "field. Assume they know the basics and common terminology, but still need "
+            "simple, direct explanations and one concrete example."
         )
     elif level == "ELI5":
         style_instruction = (
-            "Explain this to someone with about 5 years of experience in the "
-            "relevant field. Assume they are comfortable with core concepts and "
-            "standard terminology. Give a practical explanation, include important "
-            "details, and show how it is used in real work."
+            "Explain this to someone with about 5 years of experience in the relevant "
+            "field. Assume they are comfortable with core concepts and standard "
+            "terminology. Give a practical explanation, include important details, and "
+            "show how it is used in real work."
         )
     elif level == "ELI10":
         style_instruction = (
-            "Explain this to someone with about 10 years of experience in the "
-            "relevant field. Use precise professional language, discuss design "
-            "considerations, and connect the concept to deeper implementation "
-            "details, trade-offs, or architecture."
+            "Explain this to someone with about 10 years of experience in the relevant "
+            "field. Use precise professional language, discuss design considerations, "
+            "and connect the concept to deeper implementation details, trade-offs, or "
+            "architecture."
         )
     elif level == "ELI15":
         style_instruction = (
-            "Explain this to someone with about 15 years of experience in the "
-            "relevant field. Assume deep professional expertise. Focus on "
-            "subtleties, edge cases, trade-offs, failure modes, and how experts "
-            "reason about this concept in practice."
+            "Explain this to someone with about 15 years of experience in the relevant "
+            "field. Assume deep professional expertise. Focus on subtleties, edge "
+            "cases, trade-offs, failure modes, and how experts reason about this "
+            "concept in practice."
         )
     else:
         style_instruction = "Explain this clearly based on the experience level requested."
 
     prompt = (
-        f"{style_instruction}\n"
-        f"Topic/question: {question}\n"
-        f"Infer the professional field from the question. "
-        f"For example, if the question is about arrays, treat the field as "
-        f"software engineering/computer science. "
-        f"Adjust the explanation to match the requested years of experience in "
-        f"that field. Write one cohesive explanation at the requested level."
+        f"{style_instruction}\n\n"
+        f"Topic: {question}\n\n"
+        "Infer the professional field from the question. "
+        "For example, if the question is about arrays, treat the field as "
+        "software engineering/computer science. "
+        "Adjust the explanation to match the requested years of experience in "
+        "that field. Write one cohesive explanation at the requested level."
     )
     return prompt
 
 
 async def call_ollama(prompt: str) -> str:
-    """Call Ollama's /api/generate endpoint and collect the streamed response text."""
     model_name = "llama3"
     generated = []
     try:
