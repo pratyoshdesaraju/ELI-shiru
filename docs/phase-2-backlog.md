@@ -12,7 +12,7 @@ This document presents the Phase 2 backlog for ELI-Shiru from the product owner'
 |---|---|---|
 | P0-01 | Define collection, document, and chunk domain models | ✅ Done |
 | P0-02 | Implement deterministic local file storage | ✅ Done |
-| P0-03 | Build collection and document upload APIs | 🟡 In Progress |
+| P0-03 | Build collection and document upload APIs | ✅ Done |
 | P0-04 | Add background indexing orchestration | 🔲 Not Started |
 | P0-05 | Implement page-aware PDF extraction | 🔲 Not Started |
 | P0-06 | Create chunking service with provenance metadata | 🔲 Not Started |
@@ -74,7 +74,7 @@ As the product owner, this story exists to protect the "local-first, offline-fir
 
 ### P0-03: Build collection and document upload APIs
 
-**Status:** 🟡 In Progress
+**Status:** ✅ Done
 
 **Description**
 
