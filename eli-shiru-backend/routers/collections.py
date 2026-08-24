@@ -1,7 +1,7 @@
 # eli-shiru-backend/routers/collections.py
 from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, UploadFile, File
 from sqlmodel import Session, select
 
 from database import get_session
@@ -13,6 +13,7 @@ from schemas import (
     DocumentResponse,
 )
 from services.storage import save_file, delete_file
+from services.indexing import index_document
 
 router = APIRouter()
 
@@ -72,6 +73,7 @@ def get_collection(collection_id: int, session: Session = Depends(get_session)):
 )
 async def upload_documents(
     collection_id: int,
+    background_tasks: BackgroundTasks,
     files: List[UploadFile] = File(...),
     session: Session = Depends(get_session),
 ):
@@ -137,6 +139,12 @@ async def upload_documents(
         session.add(document)
         session.commit()
         session.refresh(document)
+
+        # P0-04: hand off to background indexing now that the file is safely
+        # on disk and the Document row is committed. This runs after the
+        # HTTP response is sent, using its own DB session (see
+        # services/indexing.py for why).
+        background_tasks.add_task(index_document, document.id)
 
         created_documents.append(document)
 
