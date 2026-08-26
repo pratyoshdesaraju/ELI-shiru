@@ -44,3 +44,7 @@ all_repo_code.txt
 
 # Personal working notes - not for repo
 docs/phase2-notes.md
+
+# P0-05: local RAG test corpus and convenience launch script - not for repo
+docs/RAG Documents/
+start-local.sh
