@@ -14,7 +14,11 @@ This document presents the Phase 2 backlog for ELI-Shiru from the product owner'
 | P0-02 | Implement deterministic local file storage | ✅ Done |
 | P0-03 | Build collection and document upload APIs | ✅ Done |
 | P0-04 | Add background indexing orchestration | ✅ Done |
+<<<<<<< HEAD
 | P0-05 | Implement page-aware PDF extraction | 🟡 In Progress |
+=======
+| P0-05 | Implement page-aware PDF extraction | 🔲 Not Started |
+>>>>>>> 7080a19a0d6691dc0f1a7e6f40e98f5c46984e9b
 | P0-06 | Create chunking service with provenance metadata | 🔲 Not Started |
 | P0-07 | Add local embedding generation and storage | 🔲 Not Started |
 | P0-14 | Prepare MIT 6.100L corpus ingestion and metadata conventions | 🔲 Not Started |
