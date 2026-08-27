@@ -15,7 +15,7 @@ This document presents the Phase 2 backlog for ELI-Shiru from the product owner'
 | P0-03 | Build collection and document upload APIs | ✅ Done |
 | P0-04 | Add background indexing orchestration | ✅ Done |
 | P0-05 | Implement page-aware PDF extraction | ✅ Done |
-| P0-06 | Create chunking service with provenance metadata | 🟡 In Progress |
+| P0-06 | Create chunking service with provenance metadata | ✅ Done |
 | P0-07 | Add local embedding generation and storage | 🔲 Not Started |
 | P0-14 | Prepare MIT 6.100L corpus ingestion and metadata conventions | 🔲 Not Started |
 | P0-08 | Implement collection-scoped semantic retrieval | 🔲 Not Started |
@@ -128,7 +128,7 @@ As the product owner, this story exists to protect ELI-Shiru's core Phase 2 prom
 
 ### P0-06: Create chunking service with provenance metadata
 
-**Status:** 🟡 In Progress
+**Status:** ✅ Done
 
 **Description**
 
