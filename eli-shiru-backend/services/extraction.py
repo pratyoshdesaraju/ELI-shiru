@@ -1,97 +1,77 @@
-# eli-shiru-backend/services/indexing.py
+# eli-shiru-backend/services/extraction.py
 """
-Background indexing orchestration (P0-04), now driving real extraction (P0-05).
+Page-aware PDF extraction (P0-05).
 
-This module owns the *pipeline trigger and status tracking* for turning an
-uploaded Document into an indexed one. As of P0-05, it drives page-aware PDF
-extraction. Chunking and embedding (P0-06, P0-07) still happen inside
-_run_pipeline for now, and will be added to this same function as each story
-lands -- the state machine around it doesn't change.
+This module owns exactly one job: turn a PDF file on disk into a list of
+(page_number, page_text) pairs. It does NOT chunk, embed, or touch the
+database -- that separation matters because this function should be usable
+and testable completely on its own, independent of the indexing pipeline
+that calls it.
 
 Design notes (why it's built this way):
-- Runs via FastAPI's BackgroundTasks, so it executes after the HTTP response
-  is already sent to the client. Because of that, it CANNOT reuse the
-  request-scoped session from `Depends(get_session)` -- that session's
-  lifetime is tied to the request, not to this task. So this module opens
-  its own Session directly from the shared `engine`.
-- Status is committed in two separate steps (UPLOADED -> INDEXING, then
-  INDEXING -> INDEXED/FAILED) so the "INDEXING" state is actually observable
-  by the frontend while work is happening, not just a value that flashes by.
-- Single-user, local-first app -> BackgroundTasks is the pragmatic choice
-  over a persistent job queue. The tradeoff we're accepting: if the app
-  process dies mid-index, the Document row stays stuck on INDEXING with no
-  automatic recovery. Document.status/error_message are the durable record
-  P1-01 (re-index and retry) will read from later -- retrying will just mean
-  calling index_document() again for any document sitting in FAILED (or a
-  stale INDEXING) state.
-- P0-05 note: extraction failures (PDFExtractionError) are caught by the
-  same broad except block that already existed for the placeholder. A bad
-  PDF is not a bug in this code -- it's an expected, user-facing failure
-  mode (per P0-05's acceptance criteria: "documents that cannot be
-  extracted reliably fail clearly"), so it flows through the existing
-  FAILED path with a real error message instead of a special case.
+- Returns List[Tuple[int, str]] -- one entry per PDF page -- instead of a
+  single concatenated string. This is the core design decision for this
+  story: PDFs naturally give you text per page, and once you flatten that
+  into one blob, page provenance is gone forever. Every later story that
+  depends on "which page did this text come from" (P0-06 chunking,
+  P0-12 source drawer) reads that information out of this list's structure,
+  not by re-parsing text.
+- page_number is 1-indexed to match how a learner reads and refers to pages
+  in a real PDF (page_number=1 is what a human calls "page 1"), not the
+  0-indexed position pdfplumber uses internally.
+- A page with no extractable text (e.g. a scanned image with no text layer)
+  produces an empty string for that page rather than being skipped. Skipping
+  it would silently shift page numbers for every page after it, which would
+  corrupt provenance for the rest of the document. An empty string preserves
+  the page's slot in the sequence and lets the caller decide what "empty"
+  means.
+- If every single page comes back empty, that's treated as a hard failure
+  (PDFExtractionError) rather than a "successful" extraction of nothing.
+  A document that silently indexes as INDEXED with zero usable content
+  would be worse than a document that's honestly marked FAILED.
 """
 
-from sqlmodel import Session
+from pathlib import Path
+from typing import List, Tuple
 
-from database import engine
-from models import Document, DocumentStatus
-from services.storage import get_file_path
-from services.extraction import extract_pages, PDFExtractionError
+import pdfplumber
 
 
-def index_document(document_id: int) -> None:
+class PDFExtractionError(Exception):
+    """Raised when a PDF cannot be opened, or yields no extractable text at all."""
+
+
+def extract_pages(file_path: Path) -> List[Tuple[int, str]]:
     """
-    Entry point handed to BackgroundTasks. Owns its own DB session because
-    it runs after the request/response cycle that created the original
-    session has already ended.
+    Extract text from a PDF, page by page.
+
+    Returns a list of (page_number, page_text) tuples, one per page, in
+    document order. page_number is 1-indexed. page_text is "" for a page
+    that produced no extractable text (e.g. a scanned image), rather than
+    that page being omitted from the list.
+
+    Raises PDFExtractionError if the file cannot be opened as a PDF, or if
+    every page comes back with no extractable text.
     """
-    with Session(engine) as session:
-        document = session.get(Document, document_id)
-        if document is None:
-            # Document was deleted between upload and indexing kicking off.
-            # Nothing to do -- there's no row left to mark as failed.
-            return
+    try:
+        with pdfplumber.open(file_path) as pdf:
+            pages: List[Tuple[int, str]] = []
+            for index, page in enumerate(pdf.pages):
+                page_number = index + 1
+                text = page.extract_text() or ""
+                pages.append((page_number, text.strip()))
+    except PDFExtractionError:
+        raise
+    except Exception as e:
+        raise PDFExtractionError(f"Could not open or read PDF: {e}") from e
 
-        document.status = DocumentStatus.INDEXING
-        document.error_message = None
-        session.add(document)
-        session.commit()
+    if not pages:
+        raise PDFExtractionError("PDF contains no pages.")
 
-        try:
-            _run_pipeline(document)
-        except Exception as e:
-            document.status = DocumentStatus.FAILED
-            document.error_message = f"Indexing failed: {e}"
-            session.add(document)
-            session.commit()
-            return
+    if all(text == "" for _, text in pages):
+        raise PDFExtractionError(
+            "No extractable text found on any page. "
+            "This usually means the PDF is a scanned image with no text layer."
+        )
 
-        document.status = DocumentStatus.INDEXED
-        session.add(document)
-        session.commit()
-
-
-def _run_pipeline(document: Document) -> None:
-    """
-    Runs the indexing pipeline stages that exist so far.
-
-    P0-05: extract page-aware text from the stored PDF.
-    P0-06 (chunking) and P0-07 (embedding) will extend this function with
-    their own stages as they land -- index_document()'s structure above
-    does not need to change when they do.
-    """
-    file_path = get_file_path(
-        collection_id=document.collection_id,
-        document_id=document.id,
-        filename=document.filename,
-    )
-
-    # (page_number, page_text) pairs, one per PDF page. Raises
-    # PDFExtractionError if the file can't be opened or has no extractable
-    # text at all -- that exception propagates up to index_document(),
-    # which marks the Document FAILED with the error message.
-    pages = extract_pages(file_path)
-
-    # P0-06 will consume `pages` here to build Chunk rows.
-    # P0-07 will consume those chunks to generate embeddings.
+    return pages
