@@ -141,6 +141,8 @@ As the product owner, this story exists to make sure the "pieces" of a learner's
 - [ ] Re-processing the same document produces stable, predictable chunks.
 - [ ] Chunks can be retrieved and inspected independently for later debugging and evaluation.
 
+**Notes**
+Known limitation (verified 2026-08-27): Paragraph splitting relies on blank-line layout, so continuous-prose documents (e.g. video transcripts) with no visual paragraph breaks collapse to one large chunk per page (~3,000–3,800 chars) instead of finer-grained paragraphs; slide decks and structured worksheets chunk well. Deferred — revisit if P0-08 retrieval quality suffers on transcript-sourced answers. 
 ---
 
 ### P0-07: Add local embedding generation and storage
